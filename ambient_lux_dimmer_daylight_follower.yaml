@@ -4,7 +4,7 @@ blueprint:
     Dims your lights proportionally to the ambient light level measured by a
     light sensor. The brighter it is outside, the brighter your light –
     perfect for ambient lighting, bias lighting, or garden lights that should
-    mirror natural daylight. 
+    mirror natural daylight.
   domain: automation
   input:
     light_sensor:
@@ -93,17 +93,19 @@ blueprint:
         condition:
 
 variables:
-  lux_raw: "{{ states(inputs.light_sensor) | float(0) }}"
-  max_lux: "{{ inputs.max_lux | float }}"
-  min_lux: "{{ inputs.min_lux | float }}"
-  bri_max: "{{ inputs.brightness_at_max_lux | float }}"
-  bri_min: "{{ inputs.brightness_at_min_lux | float }}"
-  lux: "{{ [min_lux, [lux_raw, max_lux] | min] | max }}"
+  _light_sensor: !input light_sensor
+  _max_lux: !input max_lux
+  _min_lux: !input min_lux
+  _bri_max: !input brightness_at_max_lux
+  _bri_min: !input brightness_at_min_lux
+  _color_temp: !input color_temp
+  lux_raw: "{{ states(_light_sensor) | float(0) }}"
+  lux: "{{ [_min_lux, [lux_raw, _max_lux] | min] | max }}"
   slope: >
-    {{ (bri_max - bri_min) / (max_lux - min_lux)
-       if (max_lux - min_lux) != 0 else 0 }}
+    {{ (_bri_max - _bri_min) / (_max_lux - _min_lux)
+       if (_max_lux - _min_lux) != 0 else 0 }}
   brightness: >
-    {{ ([bri_min, [bri_max, (slope * lux + (bri_max - slope * max_lux))]
+    {{ ([_bri_min, [_bri_max, (slope * lux + (_bri_max - slope * _max_lux))]
        | min] | max) | round(0) | int }}
 
 trigger:
@@ -111,8 +113,8 @@ trigger:
     entity_id: !input light_sensor
 
 condition:
-  - condition: template
-    value_template: "{{ run_conditions | default([]) | length == 0 or run_conditions }}"
+  - condition: and
+    conditions: !input run_conditions
 
 action:
   - service: light.turn_on
@@ -120,7 +122,11 @@ action:
     data:
       brightness_pct: "{{ brightness }}"
       transition: !input transition_time
-      color_temp_kelvin: >
-        {% if inputs.color_temp is not none and inputs.color_temp != '' %}
-          {{ inputs.color_temp | int }}
-        {% endif %}
+  - if:
+      - condition: template
+        value_template: "{{ _color_temp is not none and _color_temp != '' }}"
+    then:
+      - service: light.turn_on
+        target: !input target_lights
+        data:
+          color_temp_kelvin: "{{ _color_temp | int }}"
