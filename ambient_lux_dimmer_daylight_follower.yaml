@@ -4,7 +4,7 @@ blueprint:
     Dims your lights proportionally to the ambient light level measured by a
     light sensor. The brighter it is outside, the brighter your light –
     perfect for ambient lighting, bias lighting, or garden lights that should
-    mirror natural daylight.
+    mirror natural daylight. 
   domain: automation
   input:
     light_sensor:
